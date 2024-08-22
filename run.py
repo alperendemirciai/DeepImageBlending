@@ -68,9 +68,13 @@ canvas_mask = canvas_mask.squeeze(0).repeat(3,1).view(3,ts,ts).unsqueeze(0)
 gt_gradient = compute_gt_gradient(x_start, y_start, source_img, target_img, mask_img, gpu_id)
 
 # Convert Numpy Images Into Tensors
-source_img = torch.from_numpy(source_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
-target_img = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
-input_img = torch.randn(target_img.shape).to(gpu_id)
+#source_img = torch.from_numpy(source_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
+#target_img = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
+#input_img = torch.randn(target_img.shape).to(gpu_id)
+
+source_img = torch.from_numpy(source_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to('mps')
+target_img = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to('mps')
+input_img = torch.randn(target_img.shape).to('mps')
 
 mask_img = numpy2tensor(mask_img, gpu_id)
 mask_img = mask_img.squeeze(0).repeat(3,1).view(3,ss,ss).unsqueeze(0)
@@ -86,7 +90,8 @@ mse = torch.nn.MSELoss()
 
 # Import VGG network for computing style and content loss
 mean_shift = MeanShift(gpu_id)
-vgg = Vgg16().to(gpu_id)
+#vgg = Vgg16().to(gpu_id)
+vgg = Vgg16().to('mps')
 
 # Save reconstruction process in a video
 if opt.save_video:
@@ -97,7 +102,9 @@ while run[0] <= num_steps:
     
     def closure():
         # Composite Foreground and Background to Make Blended Image
-        blend_img = torch.zeros(target_img.shape).to(gpu_id)
+
+        #blend_img = torch.zeros(target_img.shape).to(gpu_id)
+        blend_img = torch.zeros(target_img.shape).to('mps')
         blend_img = input_img*canvas_mask + target_img*(canvas_mask-1)*(-1) 
         
         # Compute Laplacian Gradient of Blended Image
@@ -175,7 +182,8 @@ while run[0] <= num_steps:
 input_img.data.clamp_(0, 255)
 
 # Make the Final Blended Image
-blend_img = torch.zeros(target_img.shape).to(gpu_id)
+#blend_img = torch.zeros(target_img.shape).to(gpu_id)
+blend_img = torch.zeros(target_img.shape).to('mps')
 blend_img = input_img*canvas_mask + target_img*(canvas_mask-1)*(-1) 
 blend_img_np = blend_img.transpose(1,3).transpose(1,2).cpu().data.numpy()[0]
 
@@ -194,8 +202,11 @@ num_steps = opt.num_steps
 
 first_pass_img = np.array(Image.open(first_pass_img_file).convert('RGB').resize((ss, ss)))
 target_img = np.array(Image.open(target_file).convert('RGB').resize((ts, ts)))
-first_pass_img = torch.from_numpy(first_pass_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
-target_img = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
+
+#first_pass_img = torch.from_numpy(first_pass_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
+#target_img = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
+first_pass_img = torch.from_numpy(first_pass_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to('mps')
+target_img = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to('mps')
 
 first_pass_img = first_pass_img.contiguous()
 target_img = target_img.contiguous()

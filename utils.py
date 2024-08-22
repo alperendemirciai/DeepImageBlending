@@ -19,9 +19,11 @@ import asyncio
 
 def numpy2tensor(np_array, gpu_id):
     if len(np_array.shape) == 2:
-        tensor = torch.from_numpy(np_array).unsqueeze(0).float().to(gpu_id)
+        #tensor = torch.from_numpy(np_array).unsqueeze(0).float().to(gpu_id)
+        tensor = torch.from_numpy(np_array).unsqueeze(0).float().to('mps')
     else:
-        tensor = torch.from_numpy(np_array).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
+        #tensor = torch.from_numpy(np_array).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
+        tensor = torch.from_numpy(np_array).unsqueeze(0).transpose(1,3).transpose(2,3).float().to('mps')
     return tensor
 
 
@@ -34,7 +36,8 @@ def laplacian_filter_tensor(img_tensor, gpu_id):
 
     laplacian_filter = np.array([[0, -1, 0],[-1, 4, -1],[0, -1, 0]])
     laplacian_conv = nn.Conv2d(1, 1, kernel_size=3, stride=1, padding=1, bias=False)
-    laplacian_conv.weight = nn.Parameter(torch.from_numpy(laplacian_filter).float().unsqueeze(0).unsqueeze(0).to(gpu_id))
+    #laplacian_conv.weight = nn.Parameter(torch.from_numpy(laplacian_filter).float().unsqueeze(0).unsqueeze(0).to(gpu_id))
+    laplacian_conv.weight = nn.Parameter(torch.from_numpy(laplacian_filter).float().unsqueeze(0).unsqueeze(0).to('mps'))
     
     for param in laplacian_conv.parameters():
         param.requires_grad = False
@@ -52,14 +55,16 @@ def laplacian_filter_tensor(img_tensor, gpu_id):
 def compute_gt_gradient(x_start, y_start, source_img, target_img, mask, gpu_id):
     
     # compute source image gradient
-    source_img_tensor = torch.from_numpy(source_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
+    #source_img_tensor = torch.from_numpy(source_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
+    source_img_tensor = torch.from_numpy(source_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to('mps')
     red_source_gradient_tensor, green_source_gradient_tensor, blue_source_gradient_tenosr = laplacian_filter_tensor(source_img_tensor, gpu_id)    
     red_source_gradient = red_source_gradient_tensor.cpu().data.numpy()[0]
     green_source_gradient = green_source_gradient_tensor.cpu().data.numpy()[0]
     blue_source_gradient = blue_source_gradient_tenosr.cpu().data.numpy()[0]
     
     # compute target image gradient
-    target_img_tensor = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
+    #target_img_tensor = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
+    target_img_tensor = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to('mps')
     red_target_gradient_tensor, green_target_gradient_tensor, blue_target_gradient_tenosr = laplacian_filter_tensor(target_img_tensor, gpu_id)    
     red_target_gradient = red_target_gradient_tensor.cpu().data.numpy()[0]
     green_target_gradient = green_target_gradient_tensor.cpu().data.numpy()[0]
@@ -164,9 +169,15 @@ class MeanShift(nn.Conv2d):
         rgb_mean=(0.4488, 0.4371, 0.4040)
         rgb_std=(1.0, 1.0, 1.0)
         sign=-1
-        std = torch.Tensor(rgb_std).to(gpu_id)
-        self.weight.data = torch.eye(3).view(3, 3, 1, 1).to(gpu_id) / std.view(3, 1, 1, 1)
-        self.bias.data = sign * rgb_range * torch.Tensor(rgb_mean).to(gpu_id) / std
+
+        #std = torch.Tensor(rgb_std).to(gpu_id)
+        std = torch.Tensor(rgb_std).to('mps')
+
+        #self.weight.data = torch.eye(3).view(3, 3, 1, 1).to(gpu_id) / std.view(3, 1, 1, 1)
+        self.weight.data = torch.eye(3).view(3, 3, 1, 1).to('mps') / std.view(3, 1, 1, 1)
+
+        #self.bias.data = sign * rgb_range * torch.Tensor(rgb_mean).to(gpu_id) / std
+        self.bias.data = sign * rgb_range * torch.Tensor(rgb_mean).to('mps') / std
         for p in self.parameters():
             p.requires_grad = False
 

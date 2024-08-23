@@ -17,13 +17,13 @@ import time
 import asyncio
 
 
-def numpy2tensor(np_array, gpu_id):
+def numpy2tensor(np_array, device):
     if len(np_array.shape) == 2:
         #tensor = torch.from_numpy(np_array).unsqueeze(0).float().to(gpu_id)
-        tensor = torch.from_numpy(np_array).unsqueeze(0).float().to('mps')
+        tensor = torch.from_numpy(np_array).unsqueeze(0).float().to(device)
     else:
         #tensor = torch.from_numpy(np_array).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
-        tensor = torch.from_numpy(np_array).unsqueeze(0).transpose(1,3).transpose(2,3).float().to('mps')
+        tensor = torch.from_numpy(np_array).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(device)
     return tensor
 
 
@@ -32,12 +32,12 @@ def make_canvas_mask(x_start, y_start, target_img, mask):
     canvas_mask[int(x_start-mask.shape[0]*0.5):int(x_start+mask.shape[0]*0.5), int(y_start-mask.shape[1]*0.5):int(y_start+mask.shape[1]*0.5)] = mask
     return canvas_mask
 
-def laplacian_filter_tensor(img_tensor, gpu_id):
+def laplacian_filter_tensor(img_tensor, device):
 
     laplacian_filter = np.array([[0, -1, 0],[-1, 4, -1],[0, -1, 0]])
     laplacian_conv = nn.Conv2d(1, 1, kernel_size=3, stride=1, padding=1, bias=False)
     #laplacian_conv.weight = nn.Parameter(torch.from_numpy(laplacian_filter).float().unsqueeze(0).unsqueeze(0).to(gpu_id))
-    laplacian_conv.weight = nn.Parameter(torch.from_numpy(laplacian_filter).float().unsqueeze(0).unsqueeze(0).to('mps'))
+    laplacian_conv.weight = nn.Parameter(torch.from_numpy(laplacian_filter).float().unsqueeze(0).unsqueeze(0).to(device))
     
     for param in laplacian_conv.parameters():
         param.requires_grad = False
@@ -52,20 +52,21 @@ def laplacian_filter_tensor(img_tensor, gpu_id):
     return red_gradient_tensor, green_gradient_tensor, blue_gradient_tensor
     
 
-def compute_gt_gradient(x_start, y_start, source_img, target_img, mask, gpu_id):
+def compute_gt_gradient(x_start, y_start, source_img, target_img, mask, device):
     
     # compute source image gradient
     #source_img_tensor = torch.from_numpy(source_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
-    source_img_tensor = torch.from_numpy(source_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to('mps')
-    red_source_gradient_tensor, green_source_gradient_tensor, blue_source_gradient_tenosr = laplacian_filter_tensor(source_img_tensor, gpu_id)    
+    source_img_tensor = torch.from_numpy(source_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(device)
+    
+    red_source_gradient_tensor, green_source_gradient_tensor, blue_source_gradient_tenosr = laplacian_filter_tensor(source_img_tensor, device)    
     red_source_gradient = red_source_gradient_tensor.cpu().data.numpy()[0]
     green_source_gradient = green_source_gradient_tensor.cpu().data.numpy()[0]
     blue_source_gradient = blue_source_gradient_tenosr.cpu().data.numpy()[0]
     
     # compute target image gradient
     #target_img_tensor = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(gpu_id)
-    target_img_tensor = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to('mps')
-    red_target_gradient_tensor, green_target_gradient_tensor, blue_target_gradient_tenosr = laplacian_filter_tensor(target_img_tensor, gpu_id)    
+    target_img_tensor = torch.from_numpy(target_img).unsqueeze(0).transpose(1,3).transpose(2,3).float().to(device)
+    red_target_gradient_tensor, green_target_gradient_tensor, blue_target_gradient_tenosr = laplacian_filter_tensor(target_img_tensor, device)    
     red_target_gradient = red_target_gradient_tensor.cpu().data.numpy()[0]
     green_target_gradient = green_target_gradient_tensor.cpu().data.numpy()[0]
     blue_target_gradient = blue_target_gradient_tenosr.cpu().data.numpy()[0]    
@@ -103,9 +104,9 @@ def compute_gt_gradient(x_start, y_start, source_img, target_img, mask, gpu_id):
 #    np.save('blue_background_gradient.npy', blue_background_gradient)
 #    pdb.set_trace()
     
-    gt_red_gradient = numpy2tensor(gt_red_gradient, gpu_id)
-    gt_green_gradient = numpy2tensor(gt_green_gradient, gpu_id)  
-    gt_blue_gradient = numpy2tensor(gt_blue_gradient, gpu_id)
+    gt_red_gradient = numpy2tensor(gt_red_gradient, device)
+    gt_green_gradient = numpy2tensor(gt_green_gradient, device)  
+    gt_blue_gradient = numpy2tensor(gt_blue_gradient, device)
     
     gt_gradient = [gt_red_gradient, gt_green_gradient, gt_blue_gradient]
     return gt_gradient
@@ -163,7 +164,7 @@ def normalize_batch(batch):
 
 
 class MeanShift(nn.Conv2d):
-    def __init__(self, gpu_id):
+    def __init__(self, device):
         super(MeanShift, self).__init__(3, 3, kernel_size=1)
         rgb_range=1
         rgb_mean=(0.4488, 0.4371, 0.4040)
@@ -171,13 +172,13 @@ class MeanShift(nn.Conv2d):
         sign=-1
 
         #std = torch.Tensor(rgb_std).to(gpu_id)
-        std = torch.Tensor(rgb_std).to('mps')
+        std = torch.Tensor(rgb_std).to(device)
 
         #self.weight.data = torch.eye(3).view(3, 3, 1, 1).to(gpu_id) / std.view(3, 1, 1, 1)
-        self.weight.data = torch.eye(3).view(3, 3, 1, 1).to('mps') / std.view(3, 1, 1, 1)
+        self.weight.data = torch.eye(3).view(3, 3, 1, 1).to(device) / std.view(3, 1, 1, 1)
 
         #self.bias.data = sign * rgb_range * torch.Tensor(rgb_mean).to(gpu_id) / std
-        self.bias.data = sign * rgb_range * torch.Tensor(rgb_mean).to('mps') / std
+        self.bias.data = sign * rgb_range * torch.Tensor(rgb_mean).to(device) / std
         for p in self.parameters():
             p.requires_grad = False
 
